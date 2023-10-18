@@ -1,2 +1,3 @@
-./broker-service/go.sum
-./broker-service/brokerApp
+broker-service/go.sum
+broker-service/brokerApp
+.idea/
