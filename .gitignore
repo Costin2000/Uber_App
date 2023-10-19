@@ -1,3 +1,6 @@
 broker-service/go.sum
 broker-service/brokerApp
 .idea/
+authentication-service/go.sum
+authentication-service/authApp
+project/db_data/postgres

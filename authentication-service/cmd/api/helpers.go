@@ -13,11 +13,6 @@ type jsonResponse struct {
 	Data    any    `json:"data,omitempty"`
 }
 
-type errorResponse struct {
-	Error   bool   `json:"error"`
-	Message string `json:"message"`
-}
-
 func (app *Config) readJSON(w http.ResponseWriter, r *http.Request, data any) error {
 	maxBytes := 1048576 //one megabyte
 
