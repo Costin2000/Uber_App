@@ -74,26 +74,15 @@ func (app *Config) authenticate(w http.ResponseWriter, a AuthPayload) {
 	defer response.Body.Close()
 
 	//make sure we get back the correct status code
-	if response.StatusCode == http.StatusUnauthorized {
-		app.errorJSON(w, errors.New("invalid credentials"))
-		return
-	} else if response.StatusCode != http.StatusAccepted && response.StatusCode != http.StatusBadRequest {
-		app.errorJSON(w, errors.New("error calling auth service"))
+	if response.StatusCode != http.StatusAccepted {
+		var payload errorResponse
+		err = json.NewDecoder(response.Body).Decode(&payload)
+		app.writeJSON(w, response.StatusCode, payload)
 		return
 	}
 
 	var jsonFromService jsonResponse
-
 	err = json.NewDecoder(response.Body).Decode(&jsonFromService)
-	if err != nil {
-		app.errorJSON(w, err)
-		return
-	}
-
-	if jsonFromService.Error {
-		app.errorJSON(w, err, http.StatusUnauthorized)
-		return
-	}
 
 	var payload jsonResponse
 	payload.Error = false
@@ -122,25 +111,10 @@ func (app *Config) register(w http.ResponseWriter, a RegisterPayload) {
 	}
 	defer response.Body.Close()
 
-	//log.Printf("HTTP Response Status: %s\n", response.Status)
-	//for key, values := range response.Header {
-	//	for _, value := range values {
-	//		log.Printf("Header[%s]: %s\n", key, value)
-	//	}
-	//}
-	//
-	//responseBodyBytes, err := ioutil.ReadAll(response.Body)
-	//if err != nil {
-	//	app.errorJSON(w, err)
-	//	return
-	//}
-
-	//log.Printf("Response Body: %s\n", string(responseBodyBytes))
-
 	if response.StatusCode != http.StatusAccepted {
 		var payload errorResponse
 		err = json.NewDecoder(response.Body).Decode(&payload)
-		app.writeJSON(w, http.StatusBadRequest, payload)
+		app.writeJSON(w, response.StatusCode, payload)
 		return
 	}
 
