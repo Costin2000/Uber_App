@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 )
@@ -66,4 +67,22 @@ func (app *Config) errorJSON(w http.ResponseWriter, err error, status ...int) er
 	payload.Message = err.Error()
 
 	return app.writeJSON(w, statusCode, payload)
+}
+
+func (app *Config) checkTokenData(tokenString string) error {
+	tkData, err := extractFieldsFromToken(tokenString)
+	if err != nil {
+		return fmt.Errorf("invalid token (extracting data)")
+	}
+
+	user, err := app.Models.User.GetByEmail(tkData.Email)
+	if err != nil {
+		return fmt.Errorf("the token contains invalid data")
+	}
+
+	if user.ID != tkData.UserId {
+		return fmt.Errorf("the token contains invalid data")
+	}
+
+	return nil
 }

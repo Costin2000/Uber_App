@@ -8,10 +8,18 @@ import (
 
 var secretKey = []byte("secret-key")
 
-func createToken(username string) (string, error) {
+type tokenData struct {
+	Username string
+	Email    string
+	UserId   int
+}
+
+func createToken(username, email string, userID int) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
 			"username": username,
+			"email":    email,
+			"id":       userID,
 			"exp":      time.Now().Add(time.Hour * 24).Unix(),
 		})
 
@@ -21,6 +29,38 @@ func createToken(username string) (string, error) {
 	}
 
 	return tokenString, nil
+}
+
+func parseTokenClaims(tokenString string) (jwt.MapClaims, error) {
+	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
+	if err != nil {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid token claims")
+	}
+
+	return claims, nil
+}
+
+func extractFieldsFromToken(tokenString string) (tokenData, error) {
+
+	tkData := tokenData{}
+
+	// Verify the token
+	claims, err := parseTokenClaims(tokenString)
+	if err != nil {
+		return tkData, err
+	}
+
+	// Access fields from claims
+	tkData.Username = claims["username"].(string)
+	tkData.Email = claims["email"].(string)
+	tkData.UserId = int(claims["id"].(float64))
+
+	return tkData, nil
 }
 
 func verifyToken(tokenString string) error {

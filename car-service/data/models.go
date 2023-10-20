@@ -46,6 +46,7 @@ type CarRequest struct {
 type Car struct {
 	ID        int       `json:"id"`
 	UserId    int       `json:"user_id"`
+	CarName   string    `json:"car_name"`
 	City      int       `json:"city"`
 	CarType   string    `json:"car_type"`
 	CreatedAt time.Time `json:"created_at"`
@@ -101,12 +102,13 @@ func (u *Car) InsertCar(car Car) (int, error) {
 	defer cancel()
 
 	var newID int
-	stmt := `insert into users (user_id, city, car_type, created_at, updated_at)
-		values ($1, $2, $3, $4, $5, $6, $7) returning id`
+	stmt := `insert into users (user_id, city, car_name, car_type, created_at, updated_at)
+		values ($1, $2, $3, $4, $5, $6) returning id`
 
 	err := db.QueryRowContext(ctx, stmt,
 		car.UserId,
 		car.City,
+		car.CarName,
 		car.CarType,
 		time.Now(),
 		time.Now(),
