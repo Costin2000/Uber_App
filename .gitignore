@@ -5,3 +5,4 @@ authentication-service/go.sum
 authentication-service/authApp
 project/db_data/postgres
 car-service/go.sum
+car-service/carApp
