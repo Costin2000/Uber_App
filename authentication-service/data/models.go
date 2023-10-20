@@ -38,6 +38,7 @@ type User struct {
 	LastName  string    `json:"last_name,omitempty"`
 	Password  string    `json:"-"`
 	City      string    `json:"city"`
+	Type      string    `json:"type"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -47,7 +48,7 @@ func (u *User) GetAll() ([]*User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	query := `select id, email, first_name, last_name, password, city, created_at, updated_at
+	query := `select id, email, first_name, last_name, password, city, type, created_at, updated_at
 	from users order by last_name`
 
 	rows, err := db.QueryContext(ctx, query)
@@ -67,6 +68,7 @@ func (u *User) GetAll() ([]*User, error) {
 			&user.LastName,
 			&user.Password,
 			&user.City,
+			&user.Type,
 			&user.CreatedAt,
 			&user.UpdatedAt,
 		)
@@ -86,7 +88,7 @@ func (u *User) GetByEmail(email string) (*User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	query := `select id, email, first_name, last_name, password, city, created_at, updated_at from users where email = $1`
+	query := `select id, email, first_name, last_name, password, city, type, created_at, updated_at from users where email = $1`
 
 	var user User
 	row := db.QueryRowContext(ctx, query, email)
@@ -98,6 +100,7 @@ func (u *User) GetByEmail(email string) (*User, error) {
 		&user.LastName,
 		&user.Password,
 		&user.City,
+		&user.Type,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -114,7 +117,7 @@ func (u *User) GetOne(id int) (*User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	query := `select id, email, first_name, last_name, password, city, created_at, updated_at from users where id = $1`
+	query := `select id, email, first_name, last_name, password, city, type, created_at, updated_at from users where id = $1`
 
 	var user User
 	row := db.QueryRowContext(ctx, query, id)
@@ -126,6 +129,7 @@ func (u *User) GetOne(id int) (*User, error) {
 		&user.LastName,
 		&user.Password,
 		&user.City,
+		&user.Type,
 		&user.CreatedAt,
 		&user.UpdatedAt,
 	)
@@ -209,8 +213,8 @@ func (u *User) Insert(user User) (int, error) {
 	}
 
 	var newID int
-	stmt := `insert into users (email, first_name, last_name, password, city, created_at, updated_at)
-		values ($1, $2, $3, $4, $5, $6, $7) returning id`
+	stmt := `insert into users (email, first_name, last_name, password, city, type, created_at, updated_at)
+		values ($1, $2, $3, $4, $5, $6, $7, $8) returning id`
 
 	err = db.QueryRowContext(ctx, stmt,
 		user.Email,
@@ -218,6 +222,7 @@ func (u *User) Insert(user User) (int, error) {
 		user.LastName,
 		hashedPassword,
 		user.City,
+		user.Type,
 		time.Now(),
 		time.Now(),
 	).Scan(&newID)

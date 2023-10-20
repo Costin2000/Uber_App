@@ -12,13 +12,15 @@ type tokenData struct {
 	Username string
 	Email    string
 	UserId   int
+	Type     string
 }
 
-func createToken(username, email string, userID int) (string, error) {
+func createToken(username, email string, userID int, userType string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256,
 		jwt.MapClaims{
 			"username": username,
 			"email":    email,
+			"type":     userType,
 			"id":       userID,
 			"exp":      time.Now().Add(time.Hour * 24).Unix(),
 		})
@@ -59,6 +61,7 @@ func extractFieldsFromToken(tokenString string) (tokenData, error) {
 	tkData.Username = claims["username"].(string)
 	tkData.Email = claims["email"].(string)
 	tkData.UserId = int(claims["id"].(float64))
+	tkData.Type = claims["type"].(string)
 
 	return tkData, nil
 }

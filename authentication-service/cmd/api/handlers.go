@@ -38,7 +38,7 @@ func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
 		Token string     `json:"token"`
 	}
 
-	tokenString, _ := createToken(user.FirstName+user.LastName, user.Email, user.ID)
+	tokenString, _ := createToken(user.FirstName+user.LastName, user.Email, user.ID, user.Type)
 
 	payload := jsonResponse{
 		Error:   false,
@@ -58,6 +58,7 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 		LastName             string `json:"last_name,omitempty"`
 		Email                string `json:"email"`
 		City                 string `json:"city"`
+		Type                 string `json:"type"`
 		Password             string `json:"password"`
 		PasswordConfirmation string `json:"password_confirmation"`
 	}
@@ -71,6 +72,7 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 	//check if email is uniq
 	_, err = app.Models.User.GetByEmail(requestPayload.Email)
 	if err == nil {
+		// An error occurred during the database query
 		app.errorJSON(w, errors.New("email already exists"), http.StatusBadRequest)
 		return
 	}
@@ -96,6 +98,7 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 		FirstName: requestPayload.FirstName,
 		LastName:  requestPayload.LastName,
 		City:      requestPayload.City,
+		Type:      requestPayload.Type,
 	}
 
 	_, err = app.Models.User.Insert(newUser)
@@ -151,7 +154,7 @@ func (app *Config) Update(w http.ResponseWriter, r *http.Request) {
 
 	user, err := app.Models.User.GetByEmail(requestPayload.Email)
 	if err != nil {
-		app.errorJSON(w, err, http.StatusNotFound)
+		app.errorJSON(w, errors.New("user not found"), http.StatusNotFound)
 		return
 	}
 

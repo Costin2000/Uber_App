@@ -26,6 +26,7 @@ type RegisterPayload struct {
 	Password             string `json:"password"`
 	PasswordConfirmation string `json:"password_confirmation"`
 	City                 string `json:"city"`
+	Type                 string `json:"type"`
 }
 
 type UpdateUserPayload struct {
