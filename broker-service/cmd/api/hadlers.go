@@ -40,9 +40,11 @@ type UpdateUserPayload struct {
 }
 
 type CreateCarRequestPayload struct {
-	CarType string `json:"car_type"`
-	City    string `json:"city"`
-	Address string `json:"address"`
+	UserId   int    `json:"user_id"`
+	UserName string `json:"user_name"`
+	CarType  string `json:"car_type"`
+	City     string `json:"city"`
+	Address  string `json:"address"`
 }
 
 type CreateCarPayload struct {
@@ -235,9 +237,31 @@ func (app *Config) requestCar(w http.ResponseWriter, a CreateCarRequestPayload, 
 		return
 	}
 
-	request, err = http.NewRequest("POST", "http://car-service/check_token", bytes.NewBuffer(jsonData))
+	var jsonFromServiceAuth jsonResponse
+	err = json.NewDecoder(response.Body).Decode(&jsonFromServiceAuth)
+
+	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
+	a.UserId = int(tkData["user_id"].(float64))
+	a.UserName = tkData["username"].(string)
+
+	jsonData, _ = json.MarshalIndent(a, "", "\t")
+	request, err = http.NewRequest("POST", "http://car-service/car_request", bytes.NewBuffer(jsonData))
 	if err != nil {
 		app.errorJSON(w, err)
+		return
+	}
+
+	response, err = client.Do(request)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusAccepted {
+		var payload errorResponse
+		err = json.NewDecoder(response.Body).Decode(&payload)
+		app.writeJSON(w, response.StatusCode, payload)
 		return
 	}
 
@@ -246,10 +270,10 @@ func (app *Config) requestCar(w http.ResponseWriter, a CreateCarRequestPayload, 
 
 	var payload jsonResponse
 	payload.Error = false
-	payload.Message = "User updated successfully"
+	payload.Message = "Car created successfully"
 	payload.Data = jsonFromService.Data
+
 	app.writeJSON(w, http.StatusAccepted, payload)
-	return
 }
 
 func (app *Config) createCar(w http.ResponseWriter, a CreateCarPayload, bearer string) {
@@ -298,7 +322,7 @@ func (app *Config) createCar(w http.ResponseWriter, a CreateCarPayload, bearer s
 	}
 
 	jsonData, _ = json.MarshalIndent(a, "", "\t")
-	request, err = http.NewRequest("POST", "http://car-service/create_car", bytes.NewBuffer(jsonData))
+	request, err = http.NewRequest("POST", "http://car-service/car", bytes.NewBuffer(jsonData))
 	if err != nil {
 		app.errorJSON(w, err)
 		return

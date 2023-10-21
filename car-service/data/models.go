@@ -133,7 +133,7 @@ func (cr *CarRequest) InsertCarRequest(carRequest CarRequest) (int, error) {
 		carRequest.UserId,
 		carRequest.UserName,
 		carRequest.CarType,
-		carRequest.CarId,
+		nil,
 		carRequest.City,
 		carRequest.Address,
 		true,

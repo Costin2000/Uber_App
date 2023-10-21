@@ -38,7 +38,7 @@ func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
 		Token string     `json:"token"`
 	}
 
-	tokenString, _ := createToken(user.FirstName+user.LastName, user.Email, user.ID, user.Type)
+	tokenString, _ := createToken(user.FirstName+" "+user.LastName, user.Email, user.ID, user.Type)
 
 	payload := jsonResponse{
 		Error:   false,

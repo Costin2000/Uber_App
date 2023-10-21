@@ -43,3 +43,43 @@ func (app *Config) CreateCar(w http.ResponseWriter, r *http.Request) {
 
 	app.writeJSON(w, http.StatusAccepted, payload)
 }
+
+func (app *Config) CreateCarRequest(w http.ResponseWriter, r *http.Request) {
+	var requestPayload struct {
+		UserId   int    `json:"user_id"`
+		UserName string `json:"user_name"`
+		CarType  string `json:"car_type"`
+		City     string `json:"city"`
+		Address  string `json:"address"`
+	}
+
+	logRequestBody(r)
+
+	err := app.readJSON(w, r, &requestPayload)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	carRequest := data.CarRequest{
+		UserId:   requestPayload.UserId,
+		UserName: requestPayload.UserName,
+		City:     requestPayload.City,
+		CarType:  requestPayload.CarType,
+		Address:  requestPayload.Address,
+	}
+
+	_, err = app.Models.CarRequest.InsertCarRequest(carRequest)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprintf("Car has been crated"),
+		Data:    carRequest,
+	}
+
+	app.writeJSON(w, http.StatusAccepted, payload)
+}
