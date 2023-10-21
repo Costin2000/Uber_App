@@ -8,10 +8,11 @@ import (
 )
 
 type RequestPayload struct {
-	Action     string            `json:"action"`
-	Auth       AuthPayload       `json:"auth,omitempty"`
-	Register   RegisterPayload   `json:"register,omitempty"`
-	UpdateUser UpdateUserPayload `json:"update_user,omitempty"`
+	Action     string                  `json:"action"`
+	Auth       AuthPayload             `json:"auth,omitempty"`
+	Register   RegisterPayload         `json:"register,omitempty"`
+	UpdateUser UpdateUserPayload       `json:"update_user,omitempty"`
+	CarRequest CreateCarRequestPayload `json:"create_car_request,omitempty"`
 }
 
 type AuthPayload struct {
@@ -34,6 +35,12 @@ type UpdateUserPayload struct {
 	LastName  string `json:"last_name,omitempty"`
 	Email     string `json:"email"`
 	City      string `json:"city"`
+}
+
+type CreateCarRequestPayload struct {
+	CarType string `json:"car_type"`
+	City    string `json:"city"`
+	Address string `json:"address"`
 }
 
 func (app *Config) Broker(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +72,8 @@ func (app *Config) HandleSubmission(w http.ResponseWriter, r *http.Request) {
 		app.register(w, requestPayload.Register)
 	case "edit_user":
 		app.updateUser(w, requestPayload.UpdateUser, bearer)
+	case "request_car":
+		app.requestCar(w, requestPayload.CarRequest, bearer)
 	default:
 		app.errorJSON(w, errors.New("unknown action"))
 	}
@@ -183,4 +192,45 @@ func (app *Config) updateUser(w http.ResponseWriter, a UpdateUserPayload, bearer
 	payload.Data = jsonFromService.Data
 
 	app.writeJSON(w, http.StatusAccepted, payload)
+}
+
+func (app *Config) requestCar(w http.ResponseWriter, a CreateCarRequestPayload, bearer string) {
+	// create some json we'll send to the auth microservice
+	jsonData, _ := json.MarshalIndent(a, "", "\t")
+
+	// call the service
+	request, err := http.NewRequest("POST", "http://authentication-service/check_token", bytes.NewBuffer(jsonData))
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+	if len(bearer) > 0 {
+		request.Header.Set("Authorization", "Bearer "+bearer)
+	}
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusAccepted {
+		var payload errorResponse
+		err = json.NewDecoder(response.Body).Decode(&payload)
+		payload.Message = "Invalid token"
+		app.writeJSON(w, response.StatusCode, payload)
+		return
+	}
+
+	var jsonFromService jsonResponse
+	err = json.NewDecoder(response.Body).Decode(&jsonFromService)
+
+	var payload jsonResponse
+	payload.Error = false
+	payload.Message = "User updated successfully"
+	payload.Data = jsonFromService.Data
+	app.writeJSON(w, http.StatusAccepted, payload)
+	return
 }

@@ -9,10 +9,10 @@ import (
 var secretKey = []byte("secret-key")
 
 type tokenData struct {
-	Username string
-	Email    string
-	UserId   int
-	Type     string
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	UserId   int    `json:"user_id"`
+	Type     string `json:"type"`
 }
 
 func createToken(username, email string, userID int, userType string) (string, error) {
