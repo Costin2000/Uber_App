@@ -30,17 +30,17 @@ type Models struct {
 }
 
 type CarRequest struct {
-	ID        int       `json:"id"`
-	UserId    int       `json:"user_id"`
-	UserName  string    `json:"user_name"`
-	CarType   string    `json:"car_type"`
-	CarId     int       `json:"car_id"`
-	City      string    `json:"city"`
-	Address   string    `json:"address"`
-	Active    bool      `json:"active"`
-	Rating    int       `json:"rating,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID        int           `json:"id"`
+	UserId    int           `json:"user_id"`
+	UserName  string        `json:"user_name"`
+	CarType   string        `json:"car_type"`
+	CarId     sql.NullInt64 `json:"car_id"`
+	City      string        `json:"city"`
+	Address   string        `json:"address"`
+	Active    bool          `json:"active"`
+	Rating    int           `json:"rating,omitempty"`
+	CreatedAt time.Time     `json:"created_at"`
+	UpdatedAt time.Time     `json:"updated_at"`
 }
 
 type Car struct {
@@ -54,17 +54,43 @@ type Car struct {
 }
 
 // GetAllCarRequestByCity returns active car requests by city and car type
-func (c *Car) GetAllCarRequestByCity(city, carType string) ([]*CarRequest, error) {
+func (c *CarRequest) GetAllCarRequestByCity(city, carType string, active bool) ([]*CarRequest, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
-	query := `
-        SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
-        FROM car_requests
-        WHERE active = true AND city = $1 AND car_type = $2
-    `
+	var rows *sql.Rows
+	var err error
 
-	rows, err := db.QueryContext(ctx, query, city, carType)
+	if len(city) > 0 && len(carType) > 0 {
+		query := `
+			SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
+			FROM car_requests
+			WHERE city = $1 AND car_type = $2 AND active = $3
+    	`
+		rows, err = db.QueryContext(ctx, query, city, carType, active)
+	} else if len(city) > 0 && len(carType) == 0 {
+		query := `
+			SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
+			FROM car_requests
+			WHERE city = $1 AND active = $2
+    	`
+		rows, err = db.QueryContext(ctx, query, city, active)
+	} else if len(city) == 0 && len(carType) > 0 {
+		query := `
+			SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
+			FROM car_requests
+			WHERE car_type = $1 AND active = $2
+    	`
+		rows, err = db.QueryContext(ctx, query, carType, active)
+	} else {
+		query := `
+			SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
+			FROM car_requests
+			WHERE active = $1
+    	`
+		rows, err = db.QueryContext(ctx, query, active)
+	}
+
 	if err != nil {
 		return nil, err
 	}

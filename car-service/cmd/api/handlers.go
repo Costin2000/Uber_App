@@ -4,6 +4,7 @@ import (
 	"car-service/data"
 	"fmt"
 	"net/http"
+	"strconv"
 )
 
 func (app *Config) CreateCar(w http.ResponseWriter, r *http.Request) {
@@ -79,6 +80,42 @@ func (app *Config) CreateCarRequest(w http.ResponseWriter, r *http.Request) {
 		Error:   false,
 		Message: fmt.Sprintf("Car has been crated"),
 		Data:    carRequest,
+	}
+
+	app.writeJSON(w, http.StatusAccepted, payload)
+}
+
+func (app *Config) GetAllCarRequests(w http.ResponseWriter, r *http.Request) {
+	carType := r.URL.Query().Get("car_type")
+	city := r.URL.Query().Get("city")
+	activeStr := r.URL.Query().Get("active")
+	active, err := strconv.ParseBool(activeStr)
+	if err != nil {
+		active = true
+	}
+
+	carRequests, err := app.Models.CarRequest.GetAllCarRequestByCity(city, carType, active)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	type CarRequestsResponse struct {
+		CarRequests []data.CarRequest `json:"car_requests"`
+	}
+
+	// Create a new slice of CarRequest with the same length as carRequests
+	convertedCarRequests := make([]data.CarRequest, len(carRequests))
+
+	// Copy values from carRequests (of type []*CarRequest) to convertedCarRequests
+	for i, cr := range carRequests {
+		convertedCarRequests[i] = *cr
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprintf("Car has been crated"),
+		Data:    CarRequestsResponse{CarRequests: convertedCarRequests},
 	}
 
 	app.writeJSON(w, http.StatusAccepted, payload)

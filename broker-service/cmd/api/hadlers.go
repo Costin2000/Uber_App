@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 )
 
@@ -277,11 +276,7 @@ func (app *Config) requestCar(w http.ResponseWriter, a CreateCarRequestPayload, 
 }
 
 func (app *Config) createCar(w http.ResponseWriter, a CreateCarPayload, bearer string) {
-	// create some json we'll send to the auth microservice
-	jsonData, _ := json.MarshalIndent(a, "", "\t")
-	fmt.Printf("Token Data: %+v\n", a)
-	// call the service
-	request, err := http.NewRequest("POST", "http://authentication-service/check_token", bytes.NewBuffer(jsonData))
+	request, err := http.NewRequest("POST", "http://authentication-service/check_token", nil)
 	if err != nil {
 		app.errorJSON(w, err)
 		return
@@ -321,7 +316,7 @@ func (app *Config) createCar(w http.ResponseWriter, a CreateCarPayload, bearer s
 		return
 	}
 
-	jsonData, _ = json.MarshalIndent(a, "", "\t")
+	jsonData, _ := json.MarshalIndent(a, "", "\t")
 	request, err = http.NewRequest("POST", "http://car-service/car", bytes.NewBuffer(jsonData))
 	if err != nil {
 		app.errorJSON(w, err)
