@@ -10,9 +10,11 @@ func (app *Config) CreateCar(w http.ResponseWriter, r *http.Request) {
 	var requestPayload struct {
 		UserId  int    `json:"user_id"`
 		CarName string `json:"car_name"`
-		City    int    `json:"city"`
+		City    string `json:"city"`
 		CarType string `json:"car_type"`
 	}
+
+	logRequestBody(r)
 
 	err := app.readJSON(w, r, &requestPayload)
 	if err != nil {

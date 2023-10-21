@@ -47,7 +47,7 @@ type Car struct {
 	ID        int       `json:"id"`
 	UserId    int       `json:"user_id"`
 	CarName   string    `json:"car_name"`
-	City      int       `json:"city"`
+	City      string    `json:"city"`
 	CarType   string    `json:"car_type"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -102,7 +102,7 @@ func (u *Car) InsertCar(car Car) (int, error) {
 	defer cancel()
 
 	var newID int
-	stmt := `insert into users (user_id, city, car_name, car_type, created_at, updated_at)
+	stmt := `insert into cars (user_id, city, car_name, car_type, created_at, updated_at)
 		values ($1, $2, $3, $4, $5, $6) returning id`
 
 	err := db.QueryRowContext(ctx, stmt,
@@ -110,6 +110,34 @@ func (u *Car) InsertCar(car Car) (int, error) {
 		car.City,
 		car.CarName,
 		car.CarType,
+		time.Now(),
+		time.Now(),
+	).Scan(&newID)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return newID, nil
+}
+
+func (cr *CarRequest) InsertCarRequest(carRequest CarRequest) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	var newID int
+	stmt := `INSERT INTO car_requests (user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`
+
+	err := db.QueryRowContext(ctx, stmt,
+		carRequest.UserId,
+		carRequest.UserName,
+		carRequest.CarType,
+		carRequest.CarId,
+		carRequest.City,
+		carRequest.Address,
+		true,
+		0,
 		time.Now(),
 		time.Now(),
 	).Scan(&newID)

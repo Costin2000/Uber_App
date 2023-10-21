@@ -14,7 +14,7 @@ CREATE TABLE public.cars (
                              id integer DEFAULT nextval('public.car_id_seq'::regclass) NOT NULL,
                              user_id integer,
                              car_name character varying(255),
-                             city integer,
+                             city character varying(255),
                              car_type character varying(255),
                              created_at timestamp without time zone,
                              updated_at timestamp without time zone
