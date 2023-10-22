@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 )
 
@@ -69,20 +71,17 @@ func (app *Config) errorJSON(w http.ResponseWriter, err error, status ...int) er
 	return app.writeJSON(w, statusCode, payload)
 }
 
-func (app *Config) checkTokenData(tokenString string) error {
-	tkData, err := extractFieldsFromToken(tokenString)
+func logRequestBody(r *http.Request) {
+	// Read the request body
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return fmt.Errorf("invalid token (extracting data)")
+		fmt.Println("Error reading request body:", err)
+		return
 	}
 
-	user, err := app.Models.User.GetByEmail(tkData.Email)
-	if err != nil {
-		return fmt.Errorf("the token contains invalid data")
-	}
+	// Log the request body as a string
+	fmt.Println("Request Body:", string(body))
 
-	if user.ID != tkData.UserId {
-		return fmt.Errorf("the token contains invalid data")
-	}
-
-	return nil
+	// Restore the original request body to be able to use it again
+	r.Body = ioutil.NopCloser(ioutil.NopCloser(bytes.NewReader(body)))
 }

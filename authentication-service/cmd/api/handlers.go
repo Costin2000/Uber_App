@@ -4,7 +4,7 @@ import (
 	"authentification/data"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/bcrypt"
+	"log"
 	"net/http"
 )
 
@@ -38,7 +38,7 @@ func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
 		Token string     `json:"token"`
 	}
 
-	tokenString, _ := createToken(user.FirstName + user.LastName)
+	tokenString, _ := createToken(user.FirstName+" "+user.LastName, user.Email, user.ID, user.Type)
 
 	payload := jsonResponse{
 		Error:   false,
@@ -57,6 +57,8 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 		FirstName            string `json:"first_name,omitempty"`
 		LastName             string `json:"last_name,omitempty"`
 		Email                string `json:"email"`
+		City                 string `json:"city"`
+		Type                 string `json:"type"`
 		Password             string `json:"password"`
 		PasswordConfirmation string `json:"password_confirmation"`
 	}
@@ -70,6 +72,7 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 	//check if email is uniq
 	_, err = app.Models.User.GetByEmail(requestPayload.Email)
 	if err == nil {
+		// An error occurred during the database query
 		app.errorJSON(w, errors.New("email already exists"), http.StatusBadRequest)
 		return
 	}
@@ -89,18 +92,13 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(requestPayload.Password), 12)
-	if err != nil {
-		app.errorJSON(w, err, http.StatusBadRequest)
-		return
-	}
-
 	newUser := data.User{
 		Email:     requestPayload.Email,
-		Password:  string(hashedPassword),
+		Password:  requestPayload.Password,
 		FirstName: requestPayload.FirstName,
 		LastName:  requestPayload.LastName,
-		Active:    1,
+		City:      requestPayload.City,
+		Type:      requestPayload.Type,
 	}
 
 	_, err = app.Models.User.Insert(newUser)
@@ -111,5 +109,109 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 		Data:    newUser,
 	}
 
+	app.writeJSON(w, http.StatusAccepted, payload)
+}
+
+func (app *Config) Update(w http.ResponseWriter, r *http.Request) {
+	for key, values := range r.Header {
+		for _, value := range values {
+			// Print each header key and its values
+			log.Printf("Header: %s = %s", key, value)
+		}
+	}
+
+	var requestPayload struct {
+		Email     string `json:"email"`
+		FirstName string `json:"first_name,omitempty"`
+		LastName  string `json:"last_name,omitempty"`
+		City      string `json:"city"`
+	}
+
+	err := app.readJSON(w, r, &requestPayload)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	tokenString := r.Header.Get("Authorization")
+	if tokenString == "" {
+		app.errorJSON(w, errors.New("Missing authorization header"), http.StatusUnauthorized)
+		return
+	}
+	tokenString = tokenString[len("Bearer "):]
+
+	err = verifyToken(tokenString)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusUnauthorized)
+		return
+	}
+
+	err = app.checkTokenData(tokenString)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusUnauthorized)
+		return
+	}
+
+	user, err := app.Models.User.GetByEmail(requestPayload.Email)
+	if err != nil {
+		app.errorJSON(w, errors.New("user not found"), http.StatusNotFound)
+		return
+	}
+
+	if len(requestPayload.LastName) == 0 || len(requestPayload.FirstName) == 0 {
+		app.errorJSON(w, errors.New("first name and last name should not be empty"), http.StatusBadRequest)
+		return
+	}
+
+	user.City = requestPayload.City
+	user.FirstName = requestPayload.FirstName
+	user.LastName = requestPayload.LastName
+
+	err = user.Update()
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprint("User registered successfully"),
+		Data:    user,
+	}
+
+	app.writeJSON(w, http.StatusAccepted, payload)
+}
+
+func (app *Config) CheckToken(w http.ResponseWriter, r *http.Request) {
+	tokenString := r.Header.Get("Authorization")
+	if tokenString == "" {
+		app.errorJSON(w, errors.New("missing authorization header"), http.StatusUnauthorized)
+		return
+	}
+	tokenString = tokenString[len("Bearer "):]
+
+	err := verifyToken(tokenString)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusUnauthorized)
+		return
+	}
+
+	err = app.checkTokenData(tokenString)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusUnauthorized)
+		return
+	}
+
+	tkData, err := extractFieldsFromToken(tokenString)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusUnauthorized)
+		return
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprint("Token verified"),
+		Data:    tkData,
+	}
 	app.writeJSON(w, http.StatusAccepted, payload)
 }
