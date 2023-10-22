@@ -1,17 +1,6 @@
 version: '3'
 
 services:
-  broker-service:
-    build:
-      context: ./../broker-service
-      dockerfile: ./../broker-service/brocker-service.dockerfile
-    restart: always
-    ports:
-      - "8080:80"
-    deploy:
-      mode: replicated
-      replicas: 1
-
   authentication-service:
     build:
       context: ./../authentication-service
