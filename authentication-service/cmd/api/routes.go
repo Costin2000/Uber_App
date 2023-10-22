@@ -24,6 +24,6 @@ func (app *Config) routes() http.Handler {
 	mux.Post("/authenticate", app.Authenticate)
 	mux.Post("/register", app.Register)
 	mux.Post("/check_token", app.CheckToken)
-	mux.Put("/users", app.Update)
+	mux.Put("/users/{id:[0-9]+}", app.Update)
 	return mux
 }
