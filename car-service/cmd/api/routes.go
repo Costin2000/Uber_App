@@ -25,5 +25,7 @@ func (app *Config) routes() http.Handler {
 	mux.Post("/car_requests", app.CreateCarRequest)
 	mux.Get("/car_requests", app.GetAllCarRequests)
 	mux.Get("/cars", app.GetAllCars)
+	mux.Put("/cars/{id:[0-9]+}", app.UpdateCar)
+
 	return mux
 }

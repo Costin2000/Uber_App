@@ -26,3 +26,6 @@ SELECT pg_catalog.setval('public.car_id_seq', 1, true);
 
 ALTER TABLE ONLY public.cars
     ADD CONSTRAINT cars_pkey PRIMARY KEY (id);
+
+ALTER TABLE public.cars
+    ADD COLUMN active boolean DEFAULT false;

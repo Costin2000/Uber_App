@@ -49,6 +49,7 @@ type Car struct {
 	CarName   string    `json:"car_name"`
 	City      string    `json:"city"`
 	CarType   string    `json:"car_type"`
+	Active    bool      `json:"active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -90,6 +91,53 @@ func (c *CarRequest) GetAllCarRequestByCity(city, carType string, active bool) (
     	`
 		rows, err = db.QueryContext(ctx, query, active)
 	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var carRequests []*CarRequest
+
+	for rows.Next() {
+		var carRequest CarRequest
+		err := rows.Scan(
+			&carRequest.ID,
+			&carRequest.UserId,
+			&carRequest.UserName,
+			&carRequest.CarType,
+			&carRequest.CarId,
+			&carRequest.City,
+			&carRequest.Address,
+			&carRequest.Active,
+			&carRequest.Rating,
+			&carRequest.CreatedAt,
+			&carRequest.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		carRequests = append(carRequests, &carRequest)
+	}
+
+	return carRequests, nil
+}
+
+// GetAllCarRequestByCity returns active car requests by user_id
+func (c *CarRequest) GetCarRequestByUser(userId int) ([]*CarRequest, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	var rows *sql.Rows
+	var err error
+
+	query := `
+		SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
+		FROM car_requests
+		WHERE user_id = $1 AND active = true
+	`
+	rows, err = db.QueryContext(ctx, query, userId)
 
 	if err != nil {
 		return nil, err
@@ -176,17 +224,17 @@ func (cr *CarRequest) InsertCarRequest(carRequest CarRequest) (int, error) {
 }
 
 // GetAllCars returns cars by user ID
-func (c *Car) GetAllCars(userId int) ([]*Car, error) {
+func (c *Car) GetAllCars(userId int, active bool) ([]*Car, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
 	query := `
 		SELECT id, user_id, car_name, city, car_type, created_at, updated_at
 		FROM cars
-		WHERE user_id = $1
+		WHERE user_id = $1 AND active = $2
 	`
 
-	rows, err := db.QueryContext(ctx, query, userId)
+	rows, err := db.QueryContext(ctx, query, userId, active)
 	if err != nil {
 		return nil, err
 	}
@@ -213,4 +261,67 @@ func (c *Car) GetAllCars(userId int) ([]*Car, error) {
 	}
 
 	return cars, nil
+}
+
+// GetCarByID retrieves a car by its ID.
+func (c *Car) GetCarByID(id int) (*Car, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+        SELECT id, user_id, car_name, city, car_type, created_at, updated_at
+        FROM cars
+        WHERE id = $1
+    `
+
+	var car Car
+	err := db.QueryRowContext(ctx, query, id).Scan(
+		&car.ID,
+		&car.UserId,
+		&car.CarName,
+		&car.City,
+		&car.CarType,
+		&car.CreatedAt,
+		&car.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &car, nil
+}
+
+// Update updates a car's information in the database.
+func (c *Car) Update() error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	stmt := `
+        UPDATE cars
+        SET
+            user_id = $1,
+            car_name = $2,
+            city = $3,
+            car_type = $4,
+            active = $5,
+            updated_at = $6
+        WHERE id = $7
+    `
+
+	_, err := db.ExecContext(ctx, stmt,
+		c.UserId,
+		c.CarName,
+		c.City,
+		c.CarType,
+		c.Active,
+		time.Now(),
+		c.ID,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
