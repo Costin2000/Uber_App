@@ -2,12 +2,50 @@ package main
 
 import (
 	"car-service/data"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 )
 
 func (app *Config) CreateCar(w http.ResponseWriter, r *http.Request) {
+	bearer := r.Header.Get("Authorization")
+
+	request, err := http.NewRequest("POST", "http://authentication-service/check_token", nil)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+	if len(bearer) > 0 {
+		request.Header.Set("Authorization", bearer)
+	}
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		app.errorJSON(w, errors.New("internal server error"))
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusAccepted {
+		app.errorJSON(w, errors.New("invalid token"))
+		return
+	}
+
+	var jsonFromServiceAuth jsonResponse
+	err = json.NewDecoder(response.Body).Decode(&jsonFromServiceAuth)
+
+	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
+	userId := int(tkData["user_id"].(float64))
+
+	userType := tkData["type"].(string)
+	if userType != "driver" {
+		app.errorJSON(w, errors.New("You are on a customer account. Should be logged in on a driver account to create cars."))
+		return
+	}
+
 	var requestPayload struct {
 		UserId  int    `json:"user_id"`
 		CarName string `json:"car_name"`
@@ -15,9 +53,10 @@ func (app *Config) CreateCar(w http.ResponseWriter, r *http.Request) {
 		CarType string `json:"car_type"`
 	}
 
-	logRequestBody(r)
+	//logRequestBody(r)
 
-	err := app.readJSON(w, r, &requestPayload)
+	err = app.readJSON(w, r, &requestPayload)
+	requestPayload.UserId = userId
 	if err != nil {
 		app.errorJSON(w, err, http.StatusBadRequest)
 		return
@@ -46,6 +85,37 @@ func (app *Config) CreateCar(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *Config) CreateCarRequest(w http.ResponseWriter, r *http.Request) {
+	bearer := r.Header.Get("Authorization")
+
+	request, err := http.NewRequest("POST", "http://authentication-service/check_token", nil)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+	if len(bearer) > 0 {
+		request.Header.Set("Authorization", bearer)
+	}
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		app.errorJSON(w, errors.New("internal server error"))
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusAccepted {
+		app.errorJSON(w, errors.New("invalid token"))
+		return
+	}
+
+	var jsonFromServiceAuth jsonResponse
+	err = json.NewDecoder(response.Body).Decode(&jsonFromServiceAuth)
+
+	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
+	userId := int(tkData["user_id"].(float64))
+	userName := tkData["username"].(string)
+
 	var requestPayload struct {
 		UserId   int    `json:"user_id"`
 		UserName string `json:"user_name"`
@@ -54,13 +124,13 @@ func (app *Config) CreateCarRequest(w http.ResponseWriter, r *http.Request) {
 		Address  string `json:"address"`
 	}
 
-	logRequestBody(r)
-
-	err := app.readJSON(w, r, &requestPayload)
+	err = app.readJSON(w, r, &requestPayload)
 	if err != nil {
 		app.errorJSON(w, err, http.StatusBadRequest)
 		return
 	}
+	requestPayload.UserId = userId
+	requestPayload.UserName = userName
 
 	carRequest := data.CarRequest{
 		UserId:   requestPayload.UserId,
@@ -78,7 +148,7 @@ func (app *Config) CreateCarRequest(w http.ResponseWriter, r *http.Request) {
 
 	payload := jsonResponse{
 		Error:   false,
-		Message: fmt.Sprintf("Car has been crated"),
+		Message: fmt.Sprintf("Car request has been crated"),
 		Data:    carRequest,
 	}
 
@@ -86,6 +156,40 @@ func (app *Config) CreateCarRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *Config) GetAllCarRequests(w http.ResponseWriter, r *http.Request) {
+	bearer := r.Header.Get("Authorization")
+
+	request, err := http.NewRequest("POST", "http://authentication-service/check_token", nil)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+	if len(bearer) > 0 {
+		request.Header.Set("Authorization", bearer)
+	}
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		app.errorJSON(w, errors.New("internal server error"))
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusAccepted {
+		app.errorJSON(w, errors.New("invalid token"))
+		return
+	}
+
+	var jsonFromServiceAuth jsonResponse
+	err = json.NewDecoder(response.Body).Decode(&jsonFromServiceAuth)
+
+	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
+	userType := tkData["type"].(string)
+	if userType != "driver" {
+		app.errorJSON(w, errors.New("You are on a customer account. Should be logged in on a driver account to get the car requests."))
+		return
+	}
+
 	carType := r.URL.Query().Get("car_type")
 	city := r.URL.Query().Get("city")
 	activeStr := r.URL.Query().Get("active")
