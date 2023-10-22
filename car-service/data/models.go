@@ -174,3 +174,43 @@ func (cr *CarRequest) InsertCarRequest(carRequest CarRequest) (int, error) {
 
 	return newID, nil
 }
+
+// GetAllCars returns cars by user ID
+func (c *Car) GetAllCars(userId int) ([]*Car, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+		SELECT id, user_id, car_name, city, car_type, created_at, updated_at
+		FROM cars
+		WHERE user_id = $1
+	`
+
+	rows, err := db.QueryContext(ctx, query, userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cars []*Car
+
+	for rows.Next() {
+		var car Car
+		err := rows.Scan(
+			&car.ID,
+			&car.UserId,
+			&car.CarName,
+			&car.City,
+			&car.CarType,
+			&car.CreatedAt,
+			&car.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		cars = append(cars, &car)
+	}
+
+	return cars, nil
+}

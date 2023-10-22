@@ -186,7 +186,7 @@ func (app *Config) GetAllCarRequests(w http.ResponseWriter, r *http.Request) {
 	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
 	userType := tkData["type"].(string)
 	if userType != "driver" {
-		app.errorJSON(w, errors.New("You are on a customer account. Should be logged in on a driver account to get the car requests."))
+		app.errorJSON(w, errors.New("you are on a customer account. Should be logged in on a driver account to get the car requests"))
 		return
 	}
 
@@ -220,6 +220,69 @@ func (app *Config) GetAllCarRequests(w http.ResponseWriter, r *http.Request) {
 		Error:   false,
 		Message: fmt.Sprintf("Car has been crated"),
 		Data:    CarRequestsResponse{CarRequests: convertedCarRequests},
+	}
+
+	app.writeJSON(w, http.StatusAccepted, payload)
+}
+
+func (app *Config) GetAllCars(w http.ResponseWriter, r *http.Request) {
+	bearer := r.Header.Get("Authorization")
+
+	request, err := http.NewRequest("POST", "http://authentication-service/check_token", nil)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+	if len(bearer) > 0 {
+		request.Header.Set("Authorization", bearer)
+	}
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		app.errorJSON(w, errors.New("internal server error"))
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusAccepted {
+		app.errorJSON(w, errors.New("invalid token"))
+		return
+	}
+
+	var jsonFromServiceAuth jsonResponse
+	err = json.NewDecoder(response.Body).Decode(&jsonFromServiceAuth)
+
+	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
+	userType := tkData["type"].(string)
+	userId := int(tkData["user_id"].(float64))
+	if userType != "driver" {
+		app.errorJSON(w, errors.New("you are on a customer account. Should be logged in on a driver account to retrieve your cars"))
+		return
+	}
+
+	cars, err := app.Models.Car.GetAllCars(userId)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	type CarsResponse struct {
+		Cars []data.Car `json:"cars"`
+	}
+
+	// Create a new slice of CarRequest with the same length as carRequests
+	convertedCars := make([]data.Car, len(cars))
+
+	// Copy values from carRequests (of type []*CarRequest) to convertedCarRequests
+	for i, cr := range cars {
+		convertedCars[i] = *cr
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprintf("Car has been crated"),
+		Data:    CarsResponse{Cars: convertedCars},
 	}
 
 	app.writeJSON(w, http.StatusAccepted, payload)

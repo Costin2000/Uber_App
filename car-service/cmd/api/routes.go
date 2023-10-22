@@ -24,5 +24,6 @@ func (app *Config) routes() http.Handler {
 	mux.Post("/cars", app.CreateCar)
 	mux.Post("/car_requests", app.CreateCarRequest)
 	mux.Get("/car_requests", app.GetAllCarRequests)
+	mux.Get("/cars", app.GetAllCars)
 	return mux
 }
