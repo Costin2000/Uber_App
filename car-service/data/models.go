@@ -398,3 +398,21 @@ func (cr *CarRequest) Update() error {
 
 	return nil
 }
+
+// DeleteCar deletes a car from the database based on its ID.
+func (c *Car) DeleteCar() error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+        DELETE FROM cars
+        WHERE id = $1
+    `
+
+	_, err := db.ExecContext(ctx, query, c.ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

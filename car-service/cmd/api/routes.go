@@ -27,6 +27,7 @@ func (app *Config) routes() http.Handler {
 	mux.Get("/cars", app.GetAllCars)
 	mux.Put("/cars/{id:[0-9]+}", app.UpdateCar)
 	mux.Put("/car_requests/{id:[0-9]+}", app.UpdateCarRequest)
+	mux.Delete("/cars/{id:[0-9]+}", app.DeleteCar)
 
 	return mux
 }

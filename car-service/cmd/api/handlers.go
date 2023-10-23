@@ -451,3 +451,68 @@ func (app *Config) UpdateCarRequest(w http.ResponseWriter, r *http.Request) {
 
 	app.writeJSON(w, http.StatusAccepted, payload)
 }
+
+func (app *Config) DeleteCar(w http.ResponseWriter, r *http.Request) {
+	bearer := r.Header.Get("Authorization")
+
+	request, err := http.NewRequest("POST", "http://authentication-service/check_token", nil)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+	if len(bearer) > 0 {
+		request.Header.Set("Authorization", bearer)
+	}
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		app.errorJSON(w, errors.New("internal server error"))
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusAccepted {
+		app.errorJSON(w, errors.New("invalid token"))
+		return
+	}
+
+	var jsonFromServiceAuth jsonResponse
+	err = json.NewDecoder(response.Body).Decode(&jsonFromServiceAuth)
+
+	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
+	userType := tkData["type"].(string)
+	if userType != "driver" {
+		app.errorJSON(w, errors.New("you are on a customer account. Should be logged in on a driver account to delete cars"))
+		return
+	}
+
+	userId := int(tkData["user_id"].(float64))
+
+	carId := chi.URLParam(r, "id")
+	intCarId, _ := strconv.Atoi(carId)
+	car, err := app.Models.Car.GetCarByID(intCarId)
+	if err != nil {
+		app.errorJSON(w, errors.New("car not found"), http.StatusBadRequest)
+		return
+	}
+
+	if userId != car.UserId {
+		app.errorJSON(w, errors.New("The car does not belong to you"), http.StatusBadRequest)
+		return
+	}
+
+	err = car.DeleteCar()
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprintf("The car has been deleted"),
+		Data:    nil,
+	}
+
+	app.writeJSON(w, http.StatusAccepted, payload)
+}
