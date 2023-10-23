@@ -325,3 +325,76 @@ func (c *Car) Update() error {
 
 	return nil
 }
+
+// GetCarRequestByID retrieves a car request by its ID.
+func (cr *CarRequest) GetCarRequestByID(id int) (*CarRequest, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+        SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
+        FROM car_requests
+        WHERE id = $1
+    `
+
+	var carRequest CarRequest
+	err := db.QueryRowContext(ctx, query, id).Scan(
+		&carRequest.ID,
+		&carRequest.UserId,
+		&carRequest.UserName,
+		&carRequest.CarType,
+		&carRequest.CarId,
+		&carRequest.City,
+		&carRequest.Address,
+		&carRequest.Active,
+		&carRequest.Rating,
+		&carRequest.CreatedAt,
+		&carRequest.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &carRequest, nil
+}
+
+// Update updates a car request's information in the database.
+func (cr *CarRequest) Update() error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	stmt := `
+        UPDATE car_requests
+        SET
+            user_id = $1,
+            user_name = $2,
+            car_type = $3,
+            car_id = $4,
+            city = $5,
+            address = $6,
+            active = $7,
+            rating = $8,
+            updated_at = $9
+        WHERE id = $10
+    `
+
+	_, err := db.ExecContext(ctx, stmt,
+		cr.UserId,
+		cr.UserName,
+		cr.CarType,
+		cr.CarId,
+		cr.City,
+		cr.Address,
+		cr.Active,
+		cr.Rating,
+		time.Now(),
+		cr.ID,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"car-service/data"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -366,6 +367,86 @@ func (app *Config) UpdateCar(w http.ResponseWriter, r *http.Request) {
 		Error:   false,
 		Message: fmt.Sprintf("The car has been updated"),
 		Data:    car,
+	}
+
+	app.writeJSON(w, http.StatusAccepted, payload)
+}
+
+func (app *Config) UpdateCarRequest(w http.ResponseWriter, r *http.Request) {
+	bearer := r.Header.Get("Authorization")
+
+	request, err := http.NewRequest("POST", "http://authentication-service/check_token", nil)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+	if len(bearer) > 0 {
+		request.Header.Set("Authorization", bearer)
+	}
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		app.errorJSON(w, errors.New("internal server error"))
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusAccepted {
+		app.errorJSON(w, errors.New("invalid token"))
+		return
+	}
+
+	var jsonFromServiceAuth jsonResponse
+	err = json.NewDecoder(response.Body).Decode(&jsonFromServiceAuth)
+
+	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
+	userId := int(tkData["user_id"].(float64))
+	userType := tkData["type"].(string)
+
+	var requestPayload struct {
+		Active bool `json:"active"`
+		CarId  *int `json:"car_id"`
+		Rating int  `json:"rating,omitempty"`
+	}
+
+	err = app.readJSON(w, r, &requestPayload)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	carRequestId := chi.URLParam(r, "id")
+	intCarRequestId, _ := strconv.Atoi(carRequestId)
+	carRequest, err := app.Models.CarRequest.GetCarRequestByID(intCarRequestId)
+	if err != nil {
+		app.errorJSON(w, errors.New("car request not found"), http.StatusBadRequest)
+		return
+	}
+
+	if userId != carRequest.UserId && userType != "driver" {
+		app.errorJSON(w, errors.New("the car request does not belong to you and you are not a driver"), http.StatusBadRequest)
+		return
+	}
+
+	carRequest.Active = requestPayload.Active
+	if requestPayload.CarId == nil {
+		carRequest.CarId = sql.NullInt64{Valid: false}
+	} else {
+		carRequest.CarId = sql.NullInt64{Int64: int64(*requestPayload.CarId), Valid: true}
+	}
+	carRequest.Rating = requestPayload.Rating
+
+	err = carRequest.Update()
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprintf("The car request has been updated"),
+		Data:    carRequest,
 	}
 
 	app.writeJSON(w, http.StatusAccepted, payload)
