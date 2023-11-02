@@ -220,7 +220,7 @@ func (app *Config) GetAllCarRequests(w http.ResponseWriter, r *http.Request) {
 
 	payload := jsonResponse{
 		Error:   false,
-		Message: fmt.Sprintf("Car has been crated"),
+		Message: fmt.Sprintf("Car requests have been crated"),
 		Data:    CarRequestsResponse{CarRequests: convertedCarRequests},
 	}
 
@@ -512,6 +512,60 @@ func (app *Config) DeleteCar(w http.ResponseWriter, r *http.Request) {
 		Error:   false,
 		Message: fmt.Sprintf("The car has been deleted"),
 		Data:    nil,
+	}
+
+	app.writeJSON(w, http.StatusAccepted, payload)
+}
+
+func (app *Config) GetCarRequest(w http.ResponseWriter, r *http.Request) {
+	bearer := r.Header.Get("Authorization")
+
+	request, err := http.NewRequest("POST", "http://authentication-service/check_token", nil)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+	if len(bearer) > 0 {
+		request.Header.Set("Authorization", bearer)
+	}
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		app.errorJSON(w, errors.New("internal server error"))
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusAccepted {
+		app.errorJSON(w, errors.New("invalid token"))
+		return
+	}
+
+	var jsonFromServiceAuth jsonResponse
+	err = json.NewDecoder(response.Body).Decode(&jsonFromServiceAuth)
+
+	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
+	userId := int(tkData["user_id"].(float64))
+
+	carRequestId := chi.URLParam(r, "id")
+	intCarRequestId, _ := strconv.Atoi(carRequestId)
+	carRequest, err := app.Models.CarRequest.GetCarRequestByID(intCarRequestId)
+
+	if err != nil {
+		app.errorJSON(w, errors.New("Car request not found"), http.StatusBadRequest)
+		return
+	}
+
+	if userId != carRequest.UserId {
+		app.errorJSON(w, errors.New("The car request does not belong to you"), http.StatusBadRequest)
+		return
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprintf("The car has been deleted"),
+		Data:    carRequest,
 	}
 
 	app.writeJSON(w, http.StatusAccepted, payload)
