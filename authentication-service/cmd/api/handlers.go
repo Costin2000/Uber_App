@@ -180,6 +180,44 @@ func (app *Config) Update(w http.ResponseWriter, r *http.Request) {
 	app.writeJSON(w, http.StatusAccepted, payload)
 }
 
+func (app *Config) GetUser(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "id")
+
+	tokenString := r.Header.Get("Authorization")
+	if tokenString == "" {
+		app.errorJSON(w, errors.New("Missing authorization header"), http.StatusUnauthorized)
+		return
+	}
+	tokenString = tokenString[len("Bearer "):]
+
+	err := verifyToken(tokenString)
+	if err != nil {
+		app.errorJSON(w, errors.New("invalid token"), http.StatusUnauthorized)
+		return
+	}
+
+	err = app.checkTokenData(tokenString)
+	if err != nil {
+		app.errorJSON(w, errors.New("invalid token"), http.StatusUnauthorized)
+		return
+	}
+
+	intUserId, _ := strconv.Atoi(userID)
+	user, err := app.Models.User.GetOne(intUserId)
+	if err != nil {
+		app.errorJSON(w, errors.New("user not found"), http.StatusNotFound)
+		return
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprint("User retrieved successfully"),
+		Data:    user,
+	}
+
+	app.writeJSON(w, http.StatusAccepted, payload)
+}
+
 func (app *Config) CheckToken(w http.ResponseWriter, r *http.Request) {
 	tokenString := r.Header.Get("Authorization")
 	if tokenString == "" {

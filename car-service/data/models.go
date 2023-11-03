@@ -38,7 +38,7 @@ type CarRequest struct {
 	City      string        `json:"city"`
 	Address   string        `json:"address"`
 	Active    bool          `json:"active"`
-	Rating    int           `json:"rating,omitempty"`
+	Rating    int           `json:"rating"`
 	CreatedAt time.Time     `json:"created_at"`
 	UpdatedAt time.Time     `json:"updated_at"`
 }
