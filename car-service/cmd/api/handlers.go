@@ -188,10 +188,7 @@ func (app *Config) GetAllCarRequests(w http.ResponseWriter, r *http.Request) {
 
 	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
 	userType := tkData["type"].(string)
-	if userType != "driver" {
-		app.errorJSON(w, errors.New("you are on a customer account. Should be logged in on a driver account to get the car requests"))
-		return
-	}
+	tkUserId := int(tkData["user_id"].(float64))
 
 	carType := r.URL.Query().Get("car_type")
 	city := r.URL.Query().Get("city")
@@ -200,8 +197,19 @@ func (app *Config) GetAllCarRequests(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		active = true
 	}
+	userId := r.URL.Query().Get("user_id")
+	userIDInt, err := strconv.Atoi(userId)
+	if err != nil {
+		userIDInt = -1
+	}
 
-	carRequests, err := app.Models.CarRequest.GetAllCarRequestByCity(city, carType, active)
+	fmt.Println("type " + userType + "id_params " + strconv.Itoa(userIDInt) + "id_token " + strconv.Itoa(tkUserId))
+	if userType == "customer" && ((userIDInt == -1) || (userIDInt != -1 && tkUserId != userIDInt)) {
+		app.errorJSON(w, errors.New("you don not have the permissions to get the car request"))
+		return
+	}
+
+	carRequests, err := app.Models.CarRequest.GetAllCarRequestByCity(city, carType, active, userIDInt)
 	if err != nil {
 		app.errorJSON(w, err, http.StatusBadRequest)
 		return

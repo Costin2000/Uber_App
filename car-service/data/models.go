@@ -55,14 +55,21 @@ type Car struct {
 }
 
 // GetAllCarRequestByCity returns active car requests by city and car type
-func (c *CarRequest) GetAllCarRequestByCity(city, carType string, active bool) ([]*CarRequest, error) {
+func (c *CarRequest) GetAllCarRequestByCity(city, carType string, active bool, userId int) ([]*CarRequest, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
 	var rows *sql.Rows
 	var err error
 
-	if len(city) > 0 && len(carType) > 0 {
+	if userId != -1 {
+		query := `
+			SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
+			FROM car_requests
+			WHERE user_id = $1
+    	`
+		rows, err = db.QueryContext(ctx, query, userId)
+	} else if len(city) > 0 && len(carType) > 0 {
 		query := `
 			SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
 			FROM car_requests
