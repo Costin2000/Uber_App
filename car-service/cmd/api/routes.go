@@ -30,6 +30,7 @@ func (app *Config) routes() http.Handler {
 	mux.Put("/car_requests/{id:[0-9]+}", app.UpdateCarRequest)
 	mux.Delete("/cars/{id:[0-9]+}", app.DeleteCar)
 	mux.Get("/cars/{id:[0-9]+}", app.GetCar)
+	mux.Get("/driver_car_requests", app.GetAllDriverCarRequests)
 
 	return mux
 }

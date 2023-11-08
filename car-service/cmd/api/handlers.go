@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"net/http"
+	"sort"
 	"strconv"
 )
 
@@ -205,7 +206,7 @@ func (app *Config) GetAllCarRequests(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("type " + userType + "id_params " + strconv.Itoa(userIDInt) + "id_token " + strconv.Itoa(tkUserId))
 	if userType == "customer" && ((userIDInt == -1) || (userIDInt != -1 && tkUserId != userIDInt)) {
-		app.errorJSON(w, errors.New("you don not have the permissions to get the car request"))
+		app.errorJSON(w, errors.New("you do not have the permissions to get those car request"))
 		return
 	}
 
@@ -214,6 +215,10 @@ func (app *Config) GetAllCarRequests(w http.ResponseWriter, r *http.Request) {
 		app.errorJSON(w, err, http.StatusBadRequest)
 		return
 	}
+
+	sort.Slice(carRequests, func(i, j int) bool {
+		return carRequests[i].CreatedAt.After(carRequests[j].CreatedAt)
+	})
 
 	type CarRequestsResponse struct {
 		CarRequests []data.CarRequest `json:"car_requests"`
@@ -272,12 +277,8 @@ func (app *Config) GetAllCars(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	activeStr := r.URL.Query().Get("active")
-	active, err := strconv.ParseBool(activeStr)
-	if err != nil {
-		active = true
-	}
-	cars, err := app.Models.Car.GetAllCars(userId, active)
+	cars, err := app.Models.Car.GetAllCars(userId)
+
 	if err != nil {
 		app.errorJSON(w, err, http.StatusBadRequest)
 		return
@@ -556,6 +557,7 @@ func (app *Config) GetCarRequest(w http.ResponseWriter, r *http.Request) {
 
 	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
 	userId := int(tkData["user_id"].(float64))
+	userType := tkData["type"].(string)
 
 	carRequestId := chi.URLParam(r, "id")
 	intCarRequestId, _ := strconv.Atoi(carRequestId)
@@ -566,7 +568,7 @@ func (app *Config) GetCarRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if userId != carRequest.UserId {
+	if userType != "driver" && userId != carRequest.UserId {
 		app.errorJSON(w, errors.New("The car request does not belong to you"), http.StatusBadRequest)
 		return
 	}
@@ -621,6 +623,74 @@ func (app *Config) GetCar(w http.ResponseWriter, r *http.Request) {
 		Error:   false,
 		Message: fmt.Sprintf("The car has been retrieved"),
 		Data:    car,
+	}
+
+	app.writeJSON(w, http.StatusAccepted, payload)
+}
+
+func (app *Config) GetAllDriverCarRequests(w http.ResponseWriter, r *http.Request) {
+	bearer := r.Header.Get("Authorization")
+
+	request, err := http.NewRequest("POST", "http://authentication-service/check_token", nil)
+	if err != nil {
+		app.errorJSON(w, err)
+		return
+	}
+	if len(bearer) > 0 {
+		request.Header.Set("Authorization", bearer)
+	}
+
+	client := &http.Client{}
+	response, err := client.Do(request)
+	if err != nil {
+		app.errorJSON(w, errors.New("internal server error"))
+		return
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != http.StatusAccepted {
+		app.errorJSON(w, errors.New("invalid token"))
+		return
+	}
+
+	var jsonFromServiceAuth jsonResponse
+	err = json.NewDecoder(response.Body).Decode(&jsonFromServiceAuth)
+
+	tkData := jsonFromServiceAuth.Data.(map[string]interface{})
+	userType := tkData["type"].(string)
+	tkUserId := int(tkData["user_id"].(float64))
+
+	if userType != "driver" {
+		app.errorJSON(w, errors.New("you should have a driver account"))
+		return
+	}
+
+	carRequests, err := app.Models.CarRequest.GetAllCarRequestByDriver(tkUserId)
+	if err != nil {
+		app.errorJSON(w, err, http.StatusBadRequest)
+		return
+	}
+
+	sort.Slice(carRequests, func(i, j int) bool {
+		return carRequests[i].CreatedAt.After(carRequests[j].CreatedAt)
+	})
+
+	type CarRequestsResponse struct {
+		CarRequests []data.CarRequest `json:"car_requests"`
+	}
+
+	// Create a new slice of CarRequest with the same length as carRequests
+	convertedCarRequests := make([]data.CarRequest, len(carRequests))
+
+	// Copy values from carRequests (of type []*CarRequest) to convertedCarRequests
+	for i, cr := range carRequests {
+		convertedCarRequests[i] = *cr
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprintf("Car requests have been retrieved"),
+		Data:    CarRequestsResponse{CarRequests: convertedCarRequests},
 	}
 
 	app.writeJSON(w, http.StatusAccepted, payload)
