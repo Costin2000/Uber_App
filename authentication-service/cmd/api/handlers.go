@@ -4,8 +4,10 @@ import (
 	"authentification/data"
 	"errors"
 	"fmt"
+	"github.com/go-chi/chi/v5"
 	"log"
 	"net/http"
+	"strconv"
 )
 
 func (app *Config) Authenticate(w http.ResponseWriter, r *http.Request) {
@@ -62,6 +64,7 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 		Password             string `json:"password"`
 		PasswordConfirmation string `json:"password_confirmation"`
 	}
+	log.Printf("Struct: %+v", requestPayload)
 
 	err := app.readJSON(w, r, &requestPayload)
 	if err != nil {
@@ -113,15 +116,9 @@ func (app *Config) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *Config) Update(w http.ResponseWriter, r *http.Request) {
-	for key, values := range r.Header {
-		for _, value := range values {
-			// Print each header key and its values
-			log.Printf("Header: %s = %s", key, value)
-		}
-	}
+	userID := chi.URLParam(r, "id")
 
 	var requestPayload struct {
-		Email     string `json:"email"`
 		FirstName string `json:"first_name,omitempty"`
 		LastName  string `json:"last_name,omitempty"`
 		City      string `json:"city"`
@@ -142,17 +139,18 @@ func (app *Config) Update(w http.ResponseWriter, r *http.Request) {
 
 	err = verifyToken(tokenString)
 	if err != nil {
-		app.errorJSON(w, err, http.StatusUnauthorized)
+		app.errorJSON(w, errors.New("invalid token"), http.StatusUnauthorized)
 		return
 	}
 
 	err = app.checkTokenData(tokenString)
 	if err != nil {
-		app.errorJSON(w, err, http.StatusUnauthorized)
+		app.errorJSON(w, errors.New("invalid token"), http.StatusUnauthorized)
 		return
 	}
 
-	user, err := app.Models.User.GetByEmail(requestPayload.Email)
+	intUserId, _ := strconv.Atoi(userID)
+	user, err := app.Models.User.GetOne(intUserId)
 	if err != nil {
 		app.errorJSON(w, errors.New("user not found"), http.StatusNotFound)
 		return
@@ -176,6 +174,44 @@ func (app *Config) Update(w http.ResponseWriter, r *http.Request) {
 	payload := jsonResponse{
 		Error:   false,
 		Message: fmt.Sprint("User registered successfully"),
+		Data:    user,
+	}
+
+	app.writeJSON(w, http.StatusAccepted, payload)
+}
+
+func (app *Config) GetUser(w http.ResponseWriter, r *http.Request) {
+	userID := chi.URLParam(r, "id")
+
+	tokenString := r.Header.Get("Authorization")
+	if tokenString == "" {
+		app.errorJSON(w, errors.New("Missing authorization header"), http.StatusUnauthorized)
+		return
+	}
+	tokenString = tokenString[len("Bearer "):]
+
+	err := verifyToken(tokenString)
+	if err != nil {
+		app.errorJSON(w, errors.New("invalid token"), http.StatusUnauthorized)
+		return
+	}
+
+	err = app.checkTokenData(tokenString)
+	if err != nil {
+		app.errorJSON(w, errors.New("invalid token"), http.StatusUnauthorized)
+		return
+	}
+
+	intUserId, _ := strconv.Atoi(userID)
+	user, err := app.Models.User.GetOne(intUserId)
+	if err != nil {
+		app.errorJSON(w, errors.New("user not found"), http.StatusNotFound)
+		return
+	}
+
+	payload := jsonResponse{
+		Error:   false,
+		Message: fmt.Sprint("User retrieved successfully"),
 		Data:    user,
 	}
 

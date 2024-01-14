@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"time"
 )
 
@@ -38,7 +39,7 @@ type CarRequest struct {
 	City      string        `json:"city"`
 	Address   string        `json:"address"`
 	Active    bool          `json:"active"`
-	Rating    int           `json:"rating,omitempty"`
+	Rating    int           `json:"rating"`
 	CreatedAt time.Time     `json:"created_at"`
 	UpdatedAt time.Time     `json:"updated_at"`
 }
@@ -49,19 +50,27 @@ type Car struct {
 	CarName   string    `json:"car_name"`
 	City      string    `json:"city"`
 	CarType   string    `json:"car_type"`
+	Active    bool      `json:"active"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // GetAllCarRequestByCity returns active car requests by city and car type
-func (c *CarRequest) GetAllCarRequestByCity(city, carType string, active bool) ([]*CarRequest, error) {
+func (c *CarRequest) GetAllCarRequestByCity(city, carType string, active bool, userId int) ([]*CarRequest, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
 	defer cancel()
 
 	var rows *sql.Rows
 	var err error
 
-	if len(city) > 0 && len(carType) > 0 {
+	if userId != -1 {
+		query := `
+			SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
+			FROM car_requests
+			WHERE user_id = $1
+    	`
+		rows, err = db.QueryContext(ctx, query, userId)
+	} else if len(city) > 0 && len(carType) > 0 {
 		query := `
 			SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
 			FROM car_requests
@@ -90,6 +99,53 @@ func (c *CarRequest) GetAllCarRequestByCity(city, carType string, active bool) (
     	`
 		rows, err = db.QueryContext(ctx, query, active)
 	}
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var carRequests []*CarRequest
+
+	for rows.Next() {
+		var carRequest CarRequest
+		err := rows.Scan(
+			&carRequest.ID,
+			&carRequest.UserId,
+			&carRequest.UserName,
+			&carRequest.CarType,
+			&carRequest.CarId,
+			&carRequest.City,
+			&carRequest.Address,
+			&carRequest.Active,
+			&carRequest.Rating,
+			&carRequest.CreatedAt,
+			&carRequest.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		carRequests = append(carRequests, &carRequest)
+	}
+
+	return carRequests, nil
+}
+
+// GetAllCarRequestByCity returns active car requests by user_id
+func (c *CarRequest) GetCarRequestByUser(userId int) ([]*CarRequest, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	var rows *sql.Rows
+	var err error
+
+	query := `
+		SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
+		FROM car_requests
+		WHERE user_id = $1 AND active = true
+	`
+	rows, err = db.QueryContext(ctx, query, userId)
 
 	if err != nil {
 		return nil, err
@@ -173,4 +229,288 @@ func (cr *CarRequest) InsertCarRequest(carRequest CarRequest) (int, error) {
 	}
 
 	return newID, nil
+}
+
+// GetAllCars returns cars by user ID
+func (c *Car) GetAllCars(userId int) ([]*Car, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+		SELECT id, user_id, car_name, city, car_type, active, created_at, updated_at
+		FROM cars
+		WHERE user_id = $1
+	`
+
+	rows, err := db.QueryContext(ctx, query, userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cars []*Car
+
+	for rows.Next() {
+		var car Car
+		err := rows.Scan(
+			&car.ID,
+			&car.UserId,
+			&car.CarName,
+			&car.City,
+			&car.CarType,
+			&car.Active,
+			&car.CreatedAt,
+			&car.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		cars = append(cars, &car)
+	}
+
+	return cars, nil
+}
+
+// GetCarByID retrieves a car by its ID.
+func (c *Car) GetCarByID(id int) (*Car, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+        SELECT id, user_id, car_name, city, car_type, created_at, updated_at
+        FROM cars
+        WHERE id = $1
+    `
+
+	var car Car
+	err := db.QueryRowContext(ctx, query, id).Scan(
+		&car.ID,
+		&car.UserId,
+		&car.CarName,
+		&car.City,
+		&car.CarType,
+		&car.CreatedAt,
+		&car.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &car, nil
+}
+
+// Update updates a car's information in the database.
+func (c *Car) Update() error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	stmt := `
+        UPDATE cars
+        SET
+            user_id = $1,
+            car_name = $2,
+            city = $3,
+            car_type = $4,
+            active = $5,
+            updated_at = $6
+        WHERE id = $7
+    `
+
+	_, err := db.ExecContext(ctx, stmt,
+		c.UserId,
+		c.CarName,
+		c.City,
+		c.CarType,
+		c.Active,
+		time.Now(),
+		c.ID,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetCarRequestByID retrieves a car request by its ID.
+func (cr *CarRequest) GetCarRequestByID(id int) (*CarRequest, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+        SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
+        FROM car_requests
+        WHERE id = $1
+    `
+
+	var carRequest CarRequest
+	err := db.QueryRowContext(ctx, query, id).Scan(
+		&carRequest.ID,
+		&carRequest.UserId,
+		&carRequest.UserName,
+		&carRequest.CarType,
+		&carRequest.CarId,
+		&carRequest.City,
+		&carRequest.Address,
+		&carRequest.Active,
+		&carRequest.Rating,
+		&carRequest.CreatedAt,
+		&carRequest.UpdatedAt,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &carRequest, nil
+}
+
+// Update updates a car request's information in the database.
+func (cr *CarRequest) Update() error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	stmt := `
+        UPDATE car_requests
+        SET
+            user_id = $1,
+            user_name = $2,
+            car_type = $3,
+            car_id = $4,
+            city = $5,
+            address = $6,
+            active = $7,
+            rating = $8,
+            updated_at = $9
+        WHERE id = $10
+    `
+
+	_, err := db.ExecContext(ctx, stmt,
+		cr.UserId,
+		cr.UserName,
+		cr.CarType,
+		cr.CarId,
+		cr.City,
+		cr.Address,
+		cr.Active,
+		cr.Rating,
+		time.Now(),
+		cr.ID,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// DeleteCar deletes a car from the database based on its ID.
+func (c *Car) DeleteCar() error {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	query := `
+        DELETE FROM cars
+        WHERE id = $1
+    `
+
+	_, err := db.ExecContext(ctx, query, c.ID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// GetAllCarRequestByCity returns active car requests by city and car type
+func (c *CarRequest) GetAllCarRequestByDriver(userId int) ([]*CarRequest, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dbTimeout)
+	defer cancel()
+
+	var cars []*Car
+
+	// Fetch all the cars for the given user ID
+	rows, err := db.QueryContext(ctx, "SELECT id, user_id, car_name, city, car_type, active, created_at, updated_at FROM cars WHERE user_id = $1", userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var car Car
+		err := rows.Scan(
+			&car.ID,
+			&car.UserId,
+			&car.CarName,
+			&car.City,
+			&car.CarType,
+			&car.Active,
+			&car.CreatedAt,
+			&car.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		cars = append(cars, &car)
+	}
+
+	var carIDs []int
+	for _, car := range cars {
+		carIDs = append(carIDs, car.ID)
+	}
+
+	var carRequests []*CarRequest
+
+	// Fetch car requests based on the retrieved car IDs
+	if len(carIDs) > 0 {
+		query := `
+            SELECT id, user_id, user_name, car_type, car_id, city, address, active, rating, created_at, updated_at
+            FROM car_requests
+            WHERE car_id IN (` + formatIDs(carIDs) + `)
+        `
+		rows, err := db.QueryContext(ctx, query)
+		if err != nil {
+			return nil, err
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var carRequest CarRequest
+			err := rows.Scan(
+				&carRequest.ID,
+				&carRequest.UserId,
+				&carRequest.UserName,
+				&carRequest.CarType,
+				&carRequest.CarId,
+				&carRequest.City,
+				&carRequest.Address,
+				&carRequest.Active,
+				&carRequest.Rating,
+				&carRequest.CreatedAt,
+				&carRequest.UpdatedAt,
+			)
+			if err != nil {
+				return nil, err
+			}
+			carRequests = append(carRequests, &carRequest)
+		}
+	}
+
+	return carRequests, nil
+}
+
+// Helper function to format IDs for SQL query
+func formatIDs(ids []int) string {
+	var formattedIDs string
+	for i, id := range ids {
+		if i > 0 {
+			formattedIDs += ", "
+		}
+		formattedIDs += strconv.Itoa(id)
+	}
+	return formattedIDs
 }

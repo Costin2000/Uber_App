@@ -13,7 +13,7 @@ func (app *Config) routes() http.Handler {
 	//specify who is allowed to connect
 	mux.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   []string{"https://*", "http://*"},
-		AllowedMethods:   []string{"GED", "POST", "DELETE", "PUT", "OPTIONS"},
+		AllowedMethods:   []string{"GET", "POST", "DELETE", "PUT", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
@@ -21,8 +21,16 @@ func (app *Config) routes() http.Handler {
 	}))
 
 	mux.Use(middleware.Heartbeat("/ping"))
-	mux.Post("/car", app.CreateCar)
-	mux.Post("/car_request", app.CreateCarRequest)
-	mux.Get("/car_request", app.GetAllCarRequests)
+	mux.Post("/cars", app.CreateCar)
+	mux.Post("/car_requests", app.CreateCarRequest)
+	mux.Get("/car_requests", app.GetAllCarRequests)
+	mux.Get("/cars", app.GetAllCars)
+	mux.Get("/car_requests/{id:[0-9]+}", app.GetCarRequest)
+	mux.Put("/cars/{id:[0-9]+}", app.UpdateCar)
+	mux.Put("/car_requests/{id:[0-9]+}", app.UpdateCarRequest)
+	mux.Delete("/cars/{id:[0-9]+}", app.DeleteCar)
+	mux.Get("/cars/{id:[0-9]+}", app.GetCar)
+	mux.Get("/driver_car_requests", app.GetAllDriverCarRequests)
+
 	return mux
 }
